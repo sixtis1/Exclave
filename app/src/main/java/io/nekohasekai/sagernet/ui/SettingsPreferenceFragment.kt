@@ -82,6 +82,10 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         DataStore.initGlobal()
         addPreferencesFromResource(R.xml.global_preferences)
 
+        findPreference<EditTextPreference>(Key.DEFAULT_SUBSCRIPTION_HTTP_HEADERS)?.apply {
+            dialogMessage = getString(R.string.format, "\nKey1: Value1\nKey2: Value2")
+        }
+
         // common
         isProxyApps = findPreference(Key.PROXY_APPS)!!
         val bypassLan = findPreference<SwitchPreference>(Key.BYPASS_LAN)!!

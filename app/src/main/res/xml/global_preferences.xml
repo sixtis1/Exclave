@@ -103,6 +103,16 @@
             app:key="providerRootCA"
             app:title="@string/root_ca_provider"
             app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_grid_3x3_24"
+            app:key="defaultSubscriptionUserAgent"
+            app:title="@string/default_subscription_user_agent"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_texture_24"
+            app:key="defaultSubscriptionHTTPHeaders"
+            app:title="@string/default_extra_headers"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/cag_route">

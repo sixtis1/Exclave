@@ -20,6 +20,8 @@
 package io.nekohasekai.sagernet.ktx
 
 import io.nekohasekai.sagernet.BuildConfig
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.SubscriptionBean
 import libexclavecore.Libexclavecore
 import libexclavecore.URL
 import java.net.IDN
@@ -188,6 +190,25 @@ fun String.toHysteriaPort(disallowFromGreaterThanTo: Boolean = false): Int {
 }
 
 const val USER_AGENT = "Exclave/${BuildConfig.VERSION_NAME}"
+
+// Subscription User-Agent: per-subscription value, else global default, else app default.
+fun effectiveUserAgent(sub: SubscriptionBean): String =
+    sub.customUserAgent.ifEmpty { DataStore.defaultSubscriptionUserAgent.ifEmpty { USER_AGENT } }
+
+// Subscription headers: global defaults first, then per-subscription overrides by name.
+fun effectiveHeaders(sub: SubscriptionBean): List<Pair<String, String>> {
+    val merged = linkedMapOf<String, String>()
+    fun parse(raw: String) {
+        for (line in raw.replace("\r\n", "\n").split("\n")) {
+            if (line.isEmpty()) continue
+            if (!line.contains(":")) error("invalid http header")
+            merged[line.substringBefore(":")] = line.substringAfter(":").trimStart()
+        }
+    }
+    parse(DataStore.defaultSubscriptionHttpHeaders)
+    parse(sub.httpHeaders)
+    return merged.toList()
+}
 
 // Taken from https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/main/client/torrc with unsupported servers removed.
 val PUBLIC_STUN_SERVERS = arrayOf(

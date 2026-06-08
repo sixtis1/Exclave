@@ -316,6 +316,8 @@ object Key {
     const val SUBSCRIPTION_NAME_FILTER1 = "subscriptionNameFilter1"
     const val SUBSCRIPTION_HTTP_HEADERS = "subscriptionHTTPHeaders"
     const val SUBSCRIPTION_AGE_PRIVATE_KEY = "subscriptionAgePrivateKey"
+    const val DEFAULT_SUBSCRIPTION_USER_AGENT = "defaultSubscriptionUserAgent"
+    const val DEFAULT_SUBSCRIPTION_HTTP_HEADERS = "defaultSubscriptionHTTPHeaders"
 
     const val EDITING_ASSET_NAME = "editingAssetName"
     const val ASSET_NAME = "assetName"

@@ -1,0 +1,190 @@
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/Constants.kt b/app/src/main/java/io/nekohasekai/sagernet/Constants.kt
+index 76b16aeb..6dbce6d8 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/Constants.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/Constants.kt
+@@ -316,6 +316,8 @@ object Key {
+     const val SUBSCRIPTION_NAME_FILTER1 = "subscriptionNameFilter1"
+     const val SUBSCRIPTION_HTTP_HEADERS = "subscriptionHTTPHeaders"
+     const val SUBSCRIPTION_AGE_PRIVATE_KEY = "subscriptionAgePrivateKey"
++    const val DEFAULT_SUBSCRIPTION_USER_AGENT = "defaultSubscriptionUserAgent"
++    const val DEFAULT_SUBSCRIPTION_HTTP_HEADERS = "defaultSubscriptionHTTPHeaders"
+ 
+     const val EDITING_ASSET_NAME = "editingAssetName"
+     const val ASSET_NAME = "assetName"
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt b/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
+index d58169f6..a1b36324 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
+@@ -133,6 +133,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
+     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
+     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
+ 
++    var defaultSubscriptionUserAgent by configurationStore.string(Key.DEFAULT_SUBSCRIPTION_USER_AGENT) { "" }
++    var defaultSubscriptionHttpHeaders by configurationStore.string(Key.DEFAULT_SUBSCRIPTION_HTTP_HEADERS) { "" }
++
+     var domainStrategy by configurationStore.string(Key.DOMAIN_STRATEGY) { "AsIs" }
+     var trafficSniffing by configurationStore.boolean(Key.TRAFFIC_SNIFFING) { true }
+     var destinationOverride by configurationStore.boolean(Key.DESTINATION_OVERRIDE)
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/group/AgeUpdater.kt b/app/src/main/java/io/nekohasekai/sagernet/group/AgeUpdater.kt
+index ab45138e..db0523cf 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/group/AgeUpdater.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/group/AgeUpdater.kt
+@@ -62,17 +62,9 @@ object AgeUpdater : GroupUpdater() {
+                 }
+             }.newRequest().apply {
+                 setURL(subscription.link)
+-                if (subscription.customUserAgent.isNotEmpty()) {
+-                    setUserAgent(subscription.customUserAgent)
+-                } else {
+-                    setUserAgent(USER_AGENT)
+-                }
+-                if (subscription.httpHeaders.isNotEmpty()) {
+-                    for (header in subscription.httpHeaders.replace("\r\n", "\n").split("\n")) {
+-                        if (header.isEmpty()) continue
+-                        if (!header.contains(":")) error("invalid http header")
+-                        setHeader(header.substringBefore(":"), header.substringAfter(":").trimStart())
+-                    }
++                setUserAgent(effectiveUserAgent(subscription))
++                for ((key, value) in effectiveHeaders(subscription)) {
++                    setHeader(key, value)
+                 }
+             }.execute()
+ 
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/group/RawUpdater.kt b/app/src/main/java/io/nekohasekai/sagernet/group/RawUpdater.kt
+index 16346d69..9206efb1 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/group/RawUpdater.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/group/RawUpdater.kt
+@@ -73,17 +73,9 @@ object RawUpdater : GroupUpdater() {
+                 }
+             }.newRequest().apply {
+                 setURL(subscription.link)
+-                if (subscription.customUserAgent.isNotEmpty()) {
+-                    setUserAgent(subscription.customUserAgent)
+-                } else {
+-                    setUserAgent(USER_AGENT)
+-                }
+-                if (subscription.httpHeaders.isNotEmpty()) {
+-                    for (header in subscription.httpHeaders.replace("\r\n", "\n").split("\n")) {
+-                        if (header.isEmpty()) continue
+-                        if (!header.contains(":")) error("invalid http header")
+-                        setHeader(header.substringBefore(":"), header.substringAfter(":").trimStart())
+-                    }
++                setUserAgent(effectiveUserAgent(subscription))
++                for ((key, value) in effectiveHeaders(subscription)) {
++                    setHeader(key, value)
+                 }
+             }.execute()
+ 
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/group/SIP008Updater.kt b/app/src/main/java/io/nekohasekai/sagernet/group/SIP008Updater.kt
+index bdc96ad5..afd81469 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/group/SIP008Updater.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/group/SIP008Updater.kt
+@@ -56,17 +56,9 @@ object SIP008Updater : GroupUpdater() {
+                 }
+             }.newRequest().apply {
+                 setURL(subscription.link)
+-                if (subscription.customUserAgent.isNotEmpty()) {
+-                    setUserAgent(subscription.customUserAgent)
+-                } else {
+-                    setUserAgent(USER_AGENT)
+-                    if (subscription.httpHeaders.isNotEmpty()) {
+-                        for (header in subscription.httpHeaders.replace("\r\n", "\n").split("\n")) {
+-                            if (header.isEmpty()) continue
+-                            if (!header.contains(":")) error("invalid http header")
+-                            setHeader(header.substringBefore(":"), header.substringAfter(":").trimStart())
+-                        }
+-                    }
++                setUserAgent(effectiveUserAgent(subscription))
++                for ((key, value) in effectiveHeaders(subscription)) {
++                    setHeader(key, value)
+                 }
+             }.execute()
+ 
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/ktx/Nets.kt b/app/src/main/java/io/nekohasekai/sagernet/ktx/Nets.kt
+index cb8e7f6e..7eabc2aa 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/ktx/Nets.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/ktx/Nets.kt
+@@ -20,6 +20,8 @@
+ package io.nekohasekai.sagernet.ktx
+ 
+ import io.nekohasekai.sagernet.BuildConfig
++import io.nekohasekai.sagernet.database.DataStore
++import io.nekohasekai.sagernet.database.SubscriptionBean
+ import libexclavecore.Libexclavecore
+ import libexclavecore.URL
+ import java.net.IDN
+@@ -189,6 +191,25 @@ fun String.toHysteriaPort(disallowFromGreaterThanTo: Boolean = false): Int {
+ 
+ const val USER_AGENT = "Exclave/${BuildConfig.VERSION_NAME}"
+ 
++// Subscription User-Agent: per-subscription value, else global default, else app default.
++fun effectiveUserAgent(sub: SubscriptionBean): String =
++    sub.customUserAgent.ifEmpty { DataStore.defaultSubscriptionUserAgent.ifEmpty { USER_AGENT } }
++
++// Subscription headers: global defaults first, then per-subscription overrides by name.
++fun effectiveHeaders(sub: SubscriptionBean): List<Pair<String, String>> {
++    val merged = linkedMapOf<String, String>()
++    fun parse(raw: String) {
++        for (line in raw.replace("\r\n", "\n").split("\n")) {
++            if (line.isEmpty()) continue
++            if (!line.contains(":")) error("invalid http header")
++            merged[line.substringBefore(":")] = line.substringAfter(":").trimStart()
++        }
++    }
++    parse(DataStore.defaultSubscriptionHttpHeaders)
++    parse(sub.httpHeaders)
++    return merged.toList()
++}
++
+ // Taken from https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/main/client/torrc with unsupported servers removed.
+ val PUBLIC_STUN_SERVERS = arrayOf(
+     "stun.epygi.com:3478",
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/ui/SettingsPreferenceFragment.kt b/app/src/main/java/io/nekohasekai/sagernet/ui/SettingsPreferenceFragment.kt
+index f691ada2..13615cab 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/ui/SettingsPreferenceFragment.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/ui/SettingsPreferenceFragment.kt
+@@ -82,6 +82,10 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
+         DataStore.initGlobal()
+         addPreferencesFromResource(R.xml.global_preferences)
+ 
++        findPreference<EditTextPreference>(Key.DEFAULT_SUBSCRIPTION_HTTP_HEADERS)?.apply {
++            dialogMessage = getString(R.string.format, "\nKey1: Value1\nKey2: Value2")
++        }
++
+         // common
+         isProxyApps = findPreference(Key.PROXY_APPS)!!
+         val bypassLan = findPreference<SwitchPreference>(Key.BYPASS_LAN)!!
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 74dd62a1..9ebd7ae7 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -310,6 +310,8 @@
+     <string name="update_when_connected_only">Update only when connected</string>
+     <string name="update_when_connected_only_sum">Prevent IP address leak</string>
+     <string name="subscription_user_agent">User agent</string>
++    <string name="default_subscription_user_agent">Default subscription User-Agent</string>
++    <string name="default_extra_headers">Default subscription headers</string>
+     <string name="confirm">Confirm</string>
+     <string name="missing_plugin">Missing plugin</string>
+     <string name="profile_requiring_plugin">Profile %s requires %s plugin, but it was not found.</string>
+diff --git a/app/src/main/res/xml/global_preferences.xml b/app/src/main/res/xml/global_preferences.xml
+index 6e5b2f92..45061e57 100644
+--- a/app/src/main/res/xml/global_preferences.xml
++++ b/app/src/main/res/xml/global_preferences.xml
+@@ -103,6 +103,16 @@
+             app:key="providerRootCA"
+             app:title="@string/root_ca_provider"
+             app:useSimpleSummaryProvider="true" />
++        <EditTextPreference
++            app:icon="@drawable/ic_baseline_grid_3x3_24"
++            app:key="defaultSubscriptionUserAgent"
++            app:title="@string/default_subscription_user_agent"
++            app:useSimpleSummaryProvider="true" />
++        <EditTextPreference
++            app:icon="@drawable/ic_baseline_texture_24"
++            app:key="defaultSubscriptionHTTPHeaders"
++            app:title="@string/default_extra_headers"
++            app:useSimpleSummaryProvider="true" />
+     </PreferenceCategory>
+ 
+     <PreferenceCategory app:title="@string/cag_route">

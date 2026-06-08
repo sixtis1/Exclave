@@ -73,17 +73,9 @@ object RawUpdater : GroupUpdater() {
                 }
             }.newRequest().apply {
                 setURL(subscription.link)
-                if (subscription.customUserAgent.isNotEmpty()) {
-                    setUserAgent(subscription.customUserAgent)
-                } else {
-                    setUserAgent(USER_AGENT)
-                }
-                if (subscription.httpHeaders.isNotEmpty()) {
-                    for (header in subscription.httpHeaders.replace("\r\n", "\n").split("\n")) {
-                        if (header.isEmpty()) continue
-                        if (!header.contains(":")) error("invalid http header")
-                        setHeader(header.substringBefore(":"), header.substringAfter(":").trimStart())
-                    }
+                setUserAgent(effectiveUserAgent(subscription))
+                for ((key, value) in effectiveHeaders(subscription)) {
+                    setHeader(key, value)
                 }
             }.execute()
 

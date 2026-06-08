@@ -133,6 +133,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
+    var defaultSubscriptionUserAgent by configurationStore.string(Key.DEFAULT_SUBSCRIPTION_USER_AGENT) { "" }
+    var defaultSubscriptionHttpHeaders by configurationStore.string(Key.DEFAULT_SUBSCRIPTION_HTTP_HEADERS) { "" }
+
     var domainStrategy by configurationStore.string(Key.DOMAIN_STRATEGY) { "AsIs" }
     var trafficSniffing by configurationStore.boolean(Key.TRAFFIC_SNIFFING) { true }
     var destinationOverride by configurationStore.boolean(Key.DESTINATION_OVERRIDE)
